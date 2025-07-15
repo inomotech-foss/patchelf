@@ -164,7 +164,7 @@ public:
 
     void printNeededLibs() const;
 
-    void noDefaultLib();
+    void setNoDefaultLib(bool noDefaultLib);
 
     void addDebugTag();
 

@@ -1984,7 +1984,7 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() const
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::noDefaultLib()
+void ElfFile<ElfFileParamNames>::setNoDefaultLib(bool noDefaultLib)
 {
     auto shdrDynamic = findSectionHeader(".dynamic");
 
@@ -1997,10 +1997,14 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
         }
     }
     if (dynFlags1) {
-        if (dynFlags1->d_un.d_val & DF_1_NODEFLIB)
+        bool currNoDefLib = dynFlags1->d_un.d_val & DF_1_NODEFLIB;
+        if (currNoDefLib == noDefaultLib)
             return;
-        dynFlags1->d_un.d_val |= DF_1_NODEFLIB;
-    } else {
+        if (noDefaultLib)
+            dynFlags1->d_un.d_val |= DF_1_NODEFLIB;
+        else
+            dynFlags1->d_un.d_val &= ~DF_1_NODEFLIB;
+    } else if (noDefaultLib) {
         std::string & newDynamic = replaceSection(".dynamic",
                 rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
@@ -2437,6 +2441,7 @@ static std::set<std::string> symbolsToClearVersion;
 static std::unordered_map<std::string_view, std::string> symbolsToRename;
 static std::unordered_set<std::string> symbolsToRenameKeys;
 static bool printNeeded = false;
+static bool setNoDefaultLib = false;
 static bool noDefaultLib = false;
 static bool printExecstack = false;
 static bool clearExecstack = false;
@@ -2489,8 +2494,8 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     elfFile.addNeeded(neededLibsToAdd);
     elfFile.clearSymbolVersions(symbolsToClearVersion);
 
-    if (noDefaultLib)
-        elfFile.noDefaultLib();
+    if (setNoDefaultLib)
+        elfFile.setNoDefaultLib(noDefaultLib);
 
     if (addDebugTag)
         elfFile.addDebugTag();
@@ -2688,7 +2693,12 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--debug") {
             debugMode = true;
         }
+        else if (arg == "--default-lib") {
+            setNoDefaultLib = true;
+            noDefaultLib = false;
+        }
         else if (arg == "--no-default-lib") {
+            setNoDefaultLib = true;
             noDefaultLib = true;
         }
         else if (arg == "--add-debug-tag") {
